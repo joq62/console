@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%% @doc console top level supervisor.
+%% @doc test_area top level supervisor.
 %% @end
 %%%-------------------------------------------------------------------
 
@@ -29,24 +29,16 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-     ChildSpecs = [#{id=>db_etcd,
-                     start=>{db_etcd_server,start,[]}},
-		  #{id=>nodelog,
-		    start=>{nodelog_server,start,[]}},
-		  #{id=>resource_discovery,
-		    start=>{resource_discovery_server,start,[]}},
-		  #{id=>connect,
-		    start=>{connect_server,start,[]}},
-		  #{id=>appl,
-		    start=>{appl_server,start,[]}},
-		  #{id=>pod,
-		    start=>{pod_server,start,[]}},
-		  #{id=>oam,
+     ChildSpecs = [#{id=>oam,
 		    start=>{oam_server,start,[]}},
-		  #{id=>infra_service_app,
-                     start=>{infra_service_server,start,[]}},
-		  #{id=>console,
-                     start=>{console_server,start,[]}}],
+		   #{id=>connect,
+		     start=>{connect_server,start,[]}},
+		   #{id=>pod,
+		     start=>{pod_server,start,[]}},
+		   #{id=>appl,
+		     start=>{appl_server,start,[]}},
+		   #{id=>console,
+		     start=>{console_server,start,[]}}],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

@@ -17,37 +17,12 @@
 
 -define(SERVER,console_server).
 
-
-% create cluster
 -export([
-	 new_cluster/1,
-	 is_cluster_deployed/0
-	 
-	]).
-
-% connect and status
--export([
+	 new_cluster/2,
 	 connect/1,
-	 disconnect/0
-	 
-	]).
 
--export([
-	 new_appl/2,
-	 new_appl/3,
-	 update_appl/3,
-	 delete_appl/2,
-		 
-
-	 ping_connect_nodes/0,
-
-	 new_db_info/0,
-	 new_connect_nodes/0,
-	 new_controllers/0,
-	 new_workers/0,
-	 
-
-	 ping/0
+	 ping/0,
+	 get_state/0
 	]).
 
 %debug
@@ -63,42 +38,12 @@
 %% External functions
 %% ====================================================================
 
-
-new_cluster(ClusterSpec)->
-    gen_server:call(?SERVER, {new_cluster,ClusterSpec},infinity).
-
-connect(ClusterSpec)->
-    gen_server:call(?SERVER, {connect,ClusterSpec},infinity).    
-disconnect()->
-    gen_server:call(?SERVER, {disconnect},infinity).    
-
-
 	    
 %% call
-new_appl(ApplSpec,HostSpec)->
-    gen_server:call(?SERVER, {new_appl,ApplSpec,HostSpec},infinity).
-new_appl(ApplSpec,HostSpec,TimeOut)->
-    gen_server:call(?SERVER, {new_appl,ApplSpec,HostSpec,TimeOut},infinity).
-update_appl(ApplSpec,PodNode,HostSpec)->
-    gen_server:call(?SERVER, {update_appl,ApplSpec,PodNode,HostSpec},infinity).
-delete_appl(ApplSpec,PodNode)->
-    gen_server:call(?SERVER, {delete_appl,ApplSpec,PodNode},infinity).
-deploy_appls()->
-    gen_server:call(?SERVER, {deploy_appls},infinity).
-
-
-new_db_info()->
-    gen_server:call(?SERVER, {new_db_info},infinity).
-new_connect_nodes()->
-    gen_server:call(?SERVER, {new_connect_nodes},infinity).
-new_controllers()->
-    gen_server:call(?SERVER, {new_controllers},infinity).
-new_workers()->
-    gen_server:call(?SERVER, {new_workers},infinity).
-	 
-
-is_cluster_deployed()->
-    gen_server:call(?SERVER, {is_cluster_deployed},infinity).
+new_cluster(ClusterSpec,HostSpec)->
+    gen_server:call(?SERVER, {new_cluster,ClusterSpec,HostSpec},infinity).
+connect(ClusterSpec)->
+    gen_server:call(?SERVER, {connect,ClusterSpec},infinity).
 
 %% debug
 
@@ -116,11 +61,11 @@ where_is_app(App)->
 call(PodNode,M,F,A,T)->
     gen_server:call(?SERVER, {call,PodNode,M,F,A,T},infinity).
 
-ping_connect_nodes()->
-    gen_server:call(?SERVER, {ping_connect_nodes},infinity).
-
 ping() ->
     gen_server:call(?SERVER, {ping}).
+
+get_state() ->
+    gen_server:call(?SERVER, {get_state}).
 %% cast
 
 

@@ -1,0 +1,10 @@
+{application,console,
+             [{description,"An OTP application"},
+              {vsn,"0.1.0"},
+              {registered,[]},
+              {mod,{console_app,[]}},
+              {applications,[kernel,stdlib]},
+              {env,[]},
+              {modules,[console,console_app,console_server,console_sup]},
+              {licenses,["Apache-2.0"]},
+              {links,[]}]}.

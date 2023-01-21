@@ -16,5 +16,5 @@
   0},
  {<<"sd">>,
   {git,"https://github.com/joq62/sd.git",
-       {ref,"09a412ab6b2bbf2d752fa5b3a7844811ffb734f8"}},
+       {ref,"0a1506b2d69a417a55ffa2d2d84cce6ef88fb719"}},
   0}].

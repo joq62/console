@@ -23,9 +23,9 @@ start_local()->
     pong=common:ping(),
     ok=application:start(sd),
     pong=sd:ping(),
-
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
+    ok=db_etcd:config(),
     ok=db_config:create_table(),
 
     ok=application:start(infra_service),

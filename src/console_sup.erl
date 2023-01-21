@@ -29,16 +29,9 @@ init([]) ->
     SupFlags = #{strategy => one_for_all,
                  intensity => 0,
                  period => 1},
-     ChildSpecs = [#{id=>oam,
-		    start=>{oam_server,start,[]}},
-		   #{id=>connect,
-		     start=>{connect_server,start,[]}},
-		   #{id=>pod,
-		     start=>{pod_server,start,[]}},
-		   #{id=>appl,
-		     start=>{appl_server,start,[]}},
+     ChildSpecs = [
 		   #{id=>console,
-		     start=>{console_server,start,[]}}],
+		     start=>{console,start,[]}}],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions

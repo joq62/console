@@ -62,8 +62,20 @@
 %%          {stop, Reason}
 %% --------------------------------------------------------------------
 init([]) -> 
-   
-    ok=lib_console:start_local(),
+    ok=application:start(pod),
+    pong=pod:ping(),
+    pong=common:ping(),
+    pong=sd:ping(),
+
+    ok=application:start(db_etcd),
+    pong=db_etcd:ping(),
+    ok=db_config:create_table(),
+
+    ok=application:start(infra_service),
+    pong=infra_service:ping(),
+    pong=parent_server:ping(),
+    pong=pod_server:ping(),
+    pong=appl_server:ping(),
 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     

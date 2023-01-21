@@ -38,6 +38,15 @@
 %% External functions
 %% ====================================================================
 
+-export([
+	 start/0,
+	 stop/0
+	]).
+
+start()-> gen_server:start_link({local, ?SERVER}, ?SERVER, [], []).
+stop()-> gen_server:call(?SERVER, {stop},infinity).
+
+
 	    
 %% call
 new_cluster(ClusterSpec,HostSpec)->

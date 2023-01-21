@@ -1,0 +1,13 @@
+{application,common,
+             [{description,"An OTP application"},
+              {vsn,"0.1.0"},
+              {registered,[]},
+              {mod,{common_app,[]}},
+              {applications,[kernel,stdlib]},
+              {env,[]},
+              {modules,[cmn_appl,common,common_app,common_server,common_sup,
+                        copy,dfs,dist_lib,list_duplicates,list_length,
+                        local_vm,mapreduce,my_ssh,node_to_id,qsort,service,
+                        ssh_vm,vm]},
+              {licenses,["Apache-2.0"]},
+              {links,[]}]}.

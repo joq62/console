@@ -63,7 +63,7 @@
 %% --------------------------------------------------------------------
 init([]) -> 
    
-    ok=lib_console:start_local(),
+  %  ok=lib_console:start_local(),
 
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     

@@ -82,24 +82,23 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({new_cluster,ClusterSpec,HostSpec},_From, State) ->
-    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-    erlang:set_cookie(node(),list_to_atom(Cookie)),
-    
-    Reply =if 
-	       State#state.cluster_spec /= undefined ->
-		   NewState=State,
-		   {error,[already_connected,State#state.cluster_spec]};
-	       true->
-		   case do_new_cluster(ClusterSpec,HostSpec,10*1000) of
-		       {error,Reason}->
-			   NewState=State,
-			   {error,Reason};
-		       {ok,ConnectNode,PodNode}->
-			   NewState=State#state{cluster_spec=ClusterSpec,connect_node=ConnectNode,pod_node=PodNode},
-			   {ok,ConnectNode,PodNode}
-		   end
-	   end,		   
+handle_call({new_cluster,ClusterSpec},_From, State) ->
+    Reply=case State#state.cluster_spec of
+	      undefined ->
+		  case lib_console:new_cluster(ClusterSpec) of
+		      {error,Reason}->
+			  NewState=State,
+			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Couldnt create new cluster ",ClusterSpec,Reason,?MODULE,?LINE]]),
+			  {error,Reason};
+		      ok->
+			  NewState=State#state{cluster_spec=ClusterSpec},
+			  ok
+		  end;
+	      _ ->
+		  NewState=State,
+		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Already created : ",State#state.cluster_spec,?MODULE,?LINE]]),
+		  {error,["Already created : ",State#state.cluster_spec]}
+	  end,		   
     {reply, Reply, NewState};
 
 handle_call({connect,ClusterSpec},_From, State) ->

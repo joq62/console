@@ -8,7 +8,7 @@
   0},
  {<<"infra_service">>,
   {git,"https://github.com/joq62/infra_service.git",
-       {ref,"62fed93b50a0d923dbd5344156b43a491c170635"}},
+       {ref,"07d4348c38efe5f439e2276af2ff4ee77233181b"}},
   0},
  {<<"nodelog">>,
   {git,"https://github.com/joq62/nodelog.git",

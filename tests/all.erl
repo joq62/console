@@ -26,6 +26,7 @@ start([ClusterSpec,_Arg2])->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     
     ok=setup(),
+    ok=create_new_cluster(ClusterSpec),
         
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
@@ -38,15 +39,28 @@ start([ClusterSpec,_Arg2])->
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-
+create_new_cluster(ClusterSpec)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    
+    ok=console:new_cluster(ClusterSpec),
+   
+    ok.
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
-
+-define(Parents,['c200_c201_parent@c200','c200_c201_parent@c201']).
+-define(Cookie,cookie_c200_c201).
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
    
+    %-- stop parents , testing only
+    erlang:set_cookie(node(),?Cookie),
+  %  Nodes=[rpc:call(N,net_adm,ping,[],5000)||N<-?Parents],
+    
+    [rpc:call(N,init,stop,[],5000)||N<-?Parents],
+    timer:sleep(1000),
+    [rpc:call(N,net_adm,ping,[],5000)||N<-?Parents],
     ok=application:start(console),
     pong=console:ping(),
     io:format("Start  ~p~n",[{console,?MODULE,?FUNCTION_NAME}]),

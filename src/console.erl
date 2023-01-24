@@ -18,7 +18,7 @@
 -define(SERVER,console_server).
 
 -export([
-	 new_cluster/2,
+	 new_cluster/1,
 	 connect/1,
 
 	 ping/0,
@@ -49,8 +49,8 @@ stop()-> gen_server:call(?SERVER, {stop},infinity).
 
 	    
 %% call
-new_cluster(ClusterSpec,HostSpec)->
-    gen_server:call(?SERVER, {new_cluster,ClusterSpec,HostSpec},infinity).
+new_cluster(ClusterSpec)->
+    gen_server:call(?SERVER, {new_cluster,ClusterSpec},infinity).
 connect(ClusterSpec)->
     gen_server:call(?SERVER, {connect,ClusterSpec},infinity).
 

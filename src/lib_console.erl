@@ -55,73 +55,85 @@ new_cluster(ClusterSpec)->
 	       {error,Reason}->
 		   {error,["Couldnt set right cookie : ",Reason,?MODULE,?LINE]};
 	       ok->
+		   io:format(" ~p~n",[{"PASSED: righ_cookie ",?MODULE,?LINE}]),
 		   case initiate_local_dbase(ClusterSpec) of
 		       {error,Reason}->
 			   {error,["Couldnt initiate local db_etcd : ",Reason,?MODULE,?LINE]};
 		       ok->
+			   io:format(" ~p~n",[{"PASSED: initiate_local_dbase ",?MODULE,?LINE}]),
+			   
 			   case start_parent_nodes() of
 			       {error,Reason}->
 				   {error,["Couldnt start parent nodes : ",Reason,?MODULE,?LINE]};
 			       {ok,_}->
-				   case start_parent_nodes() of
+				   io:format(" ~p~n",[{"PASSED: start_parent_nodes ",?MODULE,?LINE}]),
+				   case start_pod_nodes() of
 				       {error,Reason}->
 					   {error,["Couldnt start pod nodes : ",Reason,?MODULE,?LINE]};
 				       {ok,_}->
+					   io:format(" ~p~n",[{"PASSED: start_pod_nodes ",?MODULE,?LINE}]),
 					   case create_appl(common) of
 					       {error,Reason}->
 						   {error,["Couldnt start common  : ",Reason,?MODULE,?LINE]};
 					       ok->
+						   io:format(" ~p~n",[{"PASSED: create_appl(common) ",?MODULE,?LINE}]),
 						   case create_appl(sd) of
 						       {error,Reason}->
 							   {error,["Couldnt start sd  : ",Reason,?MODULE,?LINE]};
 						       ok->
+							   io:format(" ~p~n",[{"PASSED: create_appl(sd) ",?MODULE,?LINE}]),
 							   case create_appl(db_etcd) of
 							       {error,Reason}->
 								   {error,["Couldnt start db_etcd  : ",Reason,?MODULE,?LINE]};
 							       ok->
-								   case sd:call(db_etcd,db_etcd,config,[],5000) of
+								   io:format(" ~p~n",[{"PASSED: create_appl(db_etcd) ",?MODULE,?LINE}]),
+								   %%-- ensure that local db_etcd is not 
+								   DbConfig=[{Node,rpc:call(Node,db_etcd,config,[],5000)}||Node<-sd:get_node(db_etcd)],
+								   io:format(" ~p~n",[{"PASSED: sd:call(db_etcd,db_etcd,config,[],5000) ",DbConfig,?MODULE,?LINE}]),
+								   case create_appl(nodelog) of
 								       {error,Reason}->
-									   {error,["Couldnt config db_etcd : ",Reason,?MODULE,?LINE]};
+									   {error,["Couldnt start nodelog  : ",Reason,?MODULE,?LINE]};
 								       ok->
-									   case create_appl(nodelog) of
+									   io:format(" ~p~n",[{"PASSED: create_appl(nodelog) ",?MODULE,?LINE}]),
+									   {ok,ActiveApplsInfoListNodelog}=appl_server:active_appls(),
+									   true=lists:keymember(nodelog,3,ActiveApplsInfoListNodelog),
+									   [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoListNodelog,
+														   nodelog==App],
+									   IsConfig=sd:call(nodelog,nodelog,is_config,[],5000),
+									   if
+									       IsConfig=:=false->
+										   {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
+										   PathLogDir=filename:join(PodDir,?LogDir),
+										   rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
+										   ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
+										   PathLogFile=filename:join([PathLogDir,?LogFileName]),
+										   ok=rpc:call(NodelogNode,NodelogApp,config,[PathLogFile],5000),
+										   true=rpc:call(NodelogNode,NodelogApp,is_config,[],5000),
+										   ok;
+									       true ->
+										   ok
+									   end,
+									  % true=sd:call(db_etcd,mnesia,system_info,[all],5000),
+									   
+									   io:format(" ~p~n",[{"PASSED: config nodelog ",?MODULE,?LINE}]),
+									   case create_appl(infra_service) of
 									       {error,Reason}->
-										   {error,["Couldnt start nodelog  : ",Reason,?MODULE,?LINE]};
+										   {error,["Couldnt start infra_service  : ",Reason,?MODULE,?LINE]};
 									       ok->
-										   {ok,ActiveApplsInfoListNodelog}=appl_server:active_appls(),
-										   true=lists:keymember(nodelog,3,ActiveApplsInfoListNodelog),
-										   [{NodelogNode,NodelogApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoListNodelog,
-															   nodelog==App],
-										   IsConfig=sd:call(nodelog,nodelog,is_config,[],5000),
-										   if
-										       IsConfig=:=false->
-											   {ok,PodDir}=db_pod_desired_state:read(pod_dir,NodelogNode),
-											   PathLogDir=filename:join(PodDir,?LogDir),
-											   rpc:call(NodelogNode,file,del_dir_r,[PathLogDir],5000),
-											   ok=rpc:call(NodelogNode,file,make_dir,[PathLogDir],5000),
-											   PathLogFile=filename:join([PathLogDir,?LogFileName]),
-											   ok=rpc:call(NodelogNode,NodelogApp,config,[PathLogFile],5000),
-											   true=rpc:call(NodelogNode,NodelogApp,is_config,[],5000),
-											   ok=application:stop(db_etcd);
-										       true ->
-											   ok
-										   end,
-										   case create_appl(infra_service) of
-										       {error,Reason}->
-											   {error,["Couldnt start infra_service  : ",Reason,?MODULE,?LINE]};
-										       ok->
-											   case sd:call(infra_service,infra_service,is_config,[],5000) of
-											       true->
-												   ok;
-											       false->
-												   {ok,ActiveApplsInfoListInfraService}=appl_server:active_appls(),
-												   true=lists:keymember(infra_service,3,ActiveApplsInfoListInfraService),
-												   [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoListInfraService,
-																	   infra_service==App],
-												   
-												   ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
-												   true=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
-												   ok
-											   end
+										   io:format(" ~p~n",[{"PASSED: create_appl(infra_service) ",?MODULE,?LINE}]),
+										   case sd:call(infra_service,infra_service,is_config,[],5000) of
+										       true->
+											   ok;
+										       false->
+											   {ok,ActiveApplsInfoListInfraService}=appl_server:active_appls(),
+											 %  io:format("ActiveApplsInfoListInfraService ~p~n",[{"PASSED: create_appl(infra_service) ",ActiveApplsInfoListInfraService,?MODULE,?LINE}]),
+											   true=lists:keymember(infra_service,3,ActiveApplsInfoListInfraService),
+											   [{InfraServiceNode,InfraServiceApp}]=[{Node,App}||{Node,_ApplSpec,App}<-ActiveApplsInfoListInfraService,
+																	     infra_service==App],
+											   
+											   ok=rpc:call(InfraServiceNode,InfraServiceApp,config,[ClusterSpec],5000),
+											   true=rpc:call(InfraServiceNode,InfraServiceApp,is_config,[],5000),
+											   ok=application:stop(db_etcd)
 										   end
 									   end
 								   end
@@ -172,7 +184,7 @@ initiate_local_dbase(ClusterSpec)->
 %%--------------------------------------------------------------------
 start_parent_nodes()->	
     {ok,StoppedParents}=parent_server:stopped_nodes(),
-    [ok,ok]=[parent_server:create_node(Parent)||Parent<-StoppedParents],
+    _R1=[parent_server:create_node(Parent)||Parent<-StoppedParents],
     {ok,ActiveParents}=parent_server:active_nodes(),
     _R=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
 							  Pod2<-ActiveParents,
@@ -187,7 +199,7 @@ start_parent_nodes()->
 %%--------------------------------------------------------------------
 start_pod_nodes()->	
     {ok,StoppedPods}=pod_server:stopped_nodes(),
-    [ok,ok]=[pod_server:create_node(Pod)||Pod<-StoppedPods],
+    _R1=[pod_server:create_node(Pod)||Pod<-StoppedPods],
     {ok,ActivePods}=pod_server:active_nodes(),
     _R=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActivePods,
 							  Pod2<-ActivePods,
@@ -204,9 +216,7 @@ start_pod_nodes()->
 %%--------------------------------------------------------------------
 
 create_appl(WantedApp)->
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),
-
-   
+    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),   
     Stopped=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
 					   WantedApp==App],
     StartResult=[{error,Reason}||{error,Reason}<-create_appl(Stopped,[])],
@@ -222,7 +232,6 @@ create_appl([],Acc)->
     Acc;
 create_appl([{PodNode,ApplSpec,App}|T],Acc)->
     Result=appl_server:create_appl(ApplSpec,PodNode),
-    io:format("Ping  ~p~n",[{rpc:call(PodNode,App,ping,[],2000),PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
     io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
     create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
     

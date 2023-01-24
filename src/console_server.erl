@@ -64,7 +64,6 @@
 init([]) -> 
    
     ok=lib_console:start_local(),
-
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     
     {ok, #state{cluster_spec=undefined,
@@ -303,65 +302,4 @@ code_change(_OldVsn, State, _Extra) ->
 %% Returns: any (ignored by gen_server)
 %% --------------------------------------------------------------------
 
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-do_new_cluster(ClusterSpec,HostSpec,TimeOut)->
-    {ok,_}=connect_server:create_dbase_info(ClusterSpec),    
-    NodesToConnect=db_cluster_instance:nodes(connect,ClusterSpec),
-    [ConnectPodNode]=[ConnectPodNode||ConnectPodNode<-NodesToConnect,
-			{ok,HostSpec}==db_cluster_instance:read(host_spec,ClusterSpec,ConnectPodNode)],
-    Result=case connect_server:create_connect_node(ClusterSpec,ConnectPodNode,[node()]) of
-	       {error,Reason}->
-		   {error,Reason};
-	       {ok,ConnectNode,_NodeDir,_PingResult}->
-		   pod_server:create_controller_pods(ClusterSpec),
-		   pod_server:create_worker_pods(ClusterSpec),
-		   % create pod using common as the first app to load  start
-		   case pod_server:get_pod("common",HostSpec) of
-		       {error,Reason}->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-			   {error,Reason};
-		       []->
-			   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,[no_pods_available]}]),
-			   {error,[no_pods_available,?MODULE,?LINE]};
-		       {ok,PodNode}->
-			   % -define(ApplSpecs,["common","resource_discovery","nodelog","db_etcd","infra_service"]).
-			   
-			   ok=load_start_appl("common",PodNode,ClusterSpec,HostSpec,TimeOut),	  
-			   ok=load_start_appl("resource_discovery",PodNode,ClusterSpec,HostSpec,TimeOut),	
-			   ok=load_start_appl("db_etcd",PodNode,ClusterSpec,HostSpec,TimeOut),
-			   ok=db_config:create_table(),
-			   {atomic,ok}=db_config:set(cluster_spec,ClusterSpec),
 
-			   ok=load_start_appl("nodelog",PodNode,ClusterSpec,HostSpec,TimeOut),
-			   ok=load_start_appl("infra_service",PodNode,ClusterSpec,HostSpec,TimeOut),
-			   ok
-		   end
-	   end,
-    Result.
-%% --------------------------------------------------------------------
-%% Function: terminate/2
-%% Description: Shutdown the server
-%% Returns: any (ignored by gen_server)
-%% --------------------------------------------------------------------
-
-load_start_appl(ApplSpec,PodNode,ClusterSpec,HostSpec,TimeOut)->
-    {ok,PodDir}=db_cluster_instance:read(pod_dir,ClusterSpec,PodNode),
-    {ok,PodApplGitPath}=db_appl_spec:read(gitpath,ApplSpec),
-    ApplDir=filename:join([PodDir,ApplSpec]),
-		   %% set application envs
-    {ok,ApplicationConfig}=db_host_spec:read(application_config,HostSpec),  
-    _SetEnvResult=[rpc:call(PodNode,application,set_env,[[Config]],5000)||Config<-ApplicationConfig],
-    Result=case appl_server:load_start(ApplSpec,PodNode,PodApplGitPath,ApplDir,TimeOut) of
-	       {error,Reason}->
-		   rd:rpc_call(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,{error,Reason}]),
-		   {error,Reason};
-	       ok->
-		   {atomic,ok}=db_appl_instance:create(ClusterSpec,ApplSpec,PodNode,HostSpec,{date(),time()}),
-		   rd:rpc_call(nodelog,nodelog,log,[notice,?MODULE_STRING,?LINE,["application created ",ApplSpec,PodNode]]),
-		   ok
-	   end,
-    Result.

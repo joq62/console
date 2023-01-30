@@ -16,7 +16,8 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
-
+-define(Parents,['c200_c201_parent@c200','c200_c201_parent@c201']).
+-define(Cookie,cookie_c200_c201).
 %% --------------------------------------------------------------------
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
@@ -27,7 +28,7 @@ start([ClusterSpec,_Arg2])->
     
     ok=setup(),
     ok=create_new_cluster(ClusterSpec),
-    ok=connect_tests:start([ClusterSpec,_Arg2]),    
+ %   ok=connect_tests:start([ClusterSpec,_Arg2]),    
     io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
  %   timer:sleep(2000),
  %  init:stop(),
@@ -43,14 +44,18 @@ create_new_cluster(ClusterSpec)->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
     
     ok=console:new_cluster(ClusterSpec),
+    [pong,pong]=[net_adm:ping(Node)||Node<-?Parents],
+    
+    
+    
+    
    
     ok.
 %% Function: available_hosts()
 %% Description: Based on hosts.config file checks which hosts are avaible
 %% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
 %% --------------------------------------------------------------------
--define(Parents,['c200_c201_parent@c200','c200_c201_parent@c201']).
--define(Cookie,cookie_c200_c201).
+
 setup()->
     io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
    

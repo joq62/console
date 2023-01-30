@@ -63,7 +63,6 @@
 %% --------------------------------------------------------------------
 init([]) -> 
    
-    ok=lib_console:start_local(),
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     
     {ok, #state{cluster_spec=undefined,

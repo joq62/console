@@ -13,12 +13,6 @@
 
 
 -export([
-	% initial_start/0,
-	 start_local/0,
-	 ensure_right_cookie/1,
-	 load_desired_states/1,
-	 start_parent_nodes/0,
-	 start_pod_nodes/0,
 	 new_cluster/1
 	 
 	 
@@ -30,193 +24,147 @@
 %% @end
 %%--------------------------------------------------------------------
 new_cluster(ClusterSpec)->
-    ok=start_local(),
-    ok=load_desired_states(ClusterSpec),
-    {ok,_}=start_parent_nodes(),
-    {ok,PodDbEtcd}=start_pod("db_etcd"),
-    
-    ok=start_sd_common(PodDbEtcd),
-    ok=start_db_etcd(PodDbEtcd),
 
-    {ok,PodInfra}=start_pod("infra_service"),
+    ok=start_local_appls(),
+    ok=initiate_local_dbase(ClusterSpec),
+    ok=ensure_right_cookie(ClusterSpec),
     
-    ok=start_sd_common(PodInfra),
-    ok=start_infra_sevice(PodInfra),
+    {ok,ActiveParents}=start_parents(),
+    io:format("ActiveParents !!! ~p~n",[{ActiveParents,?MODULE,?FUNCTION_NAME}]),
+
+    %%-- create nodelog appl
+  
+    [{ok,NodelogPod,_NodelogApplSpec}]=lib_infra_service:create_pods_based_appl("nodelog"),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{NodelogPod,"sd",sd}]),
+    ok=lib_infra_service:create_infra_appl({NodelogPod,"nodelog",nodelog},ClusterSpec),
+    io:format("Phase 1 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+    io:format("Phase 1 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+
+    %%-- create db_etcd
+    [{ok,DbPod,_DbApplSpec}]=lib_infra_service:create_pods_based_appl("db_etcd"),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{DbPod,"sd",sd}]),
+    ok=lib_infra_service:create_infra_appl({DbPod,"db_etcd",db_etcd},ClusterSpec),
+    application:stop(db_etcd),
+    [DbPod]=sd:get_node(db_etcd),
+    io:format("DbPod ~p~n",[{DbPod,?MODULE,?FUNCTION_NAME,?LINE}]),
+    %%- Initiate db_etcd with desired_State !!
     
+    ok=parent_server:load_desired_state(ClusterSpec),
+    ok=pod_server:load_desired_state(ClusterSpec),
+    ok=appl_server:load_desired_state(ClusterSpec),
+
+  %%-- create infra_service
+    [{ok,InfraPod,InfraApplSpec}]=lib_infra_service:create_pods_based_appl("infra_service"),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"common",common}]),
+    [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"sd",sd}]),
+    ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service},ClusterSpec),
+    true=rpc:cast(InfraPod,infra_service,start_orchistrate,[]),
+    
+
+    
+    io:format("Phase 3 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+    io:format("Phase 3 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
+
+    WhichApplications2=[{Node,rpc:call(Node,application,which_applications,[],5000)}||Node<-nodes()],
+    io:format("WhichApplications2 !!! ~p~n",[{WhichApplications2,?MODULE,?FUNCTION_NAME,?LINE}]),
+    
+       
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-
-
-start_infra_sevice(PodInfra)->
-    
-
-    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
-start_db_etcd(DbEtcdNode)->
-   
-    ok=lib_appl:create_appl("db_etcd",DbEtcdNode),
-    false=rpc:call(DbEtcdNode,db_etcd,is_config,[],5000),
-    ok=rpc:call(DbEtcdNode,db_etcd,config,[],5000),
-    true=rpc:call(DbEtcdNode,db_etcd,is_config,[],5000),
-    
+start_local_appls()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-
-    ok.
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_sd_common(Pod)->
-    
-    ok=lib_appl:create_appl("common",Pod),
-    ok=lib_appl:create_appl("sd",Pod),
-    %%- On which parent is db_etcd
-
-    ok.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_pod(ApplSpec)->
-     A1=[{PodNode,db_pod_desired_state:read(appl_spec_list,PodNode)}||PodNode<-db_pod_desired_state:get_all_id()],
-    io:format("A1 ~p~n",[{A1,?MODULE,?FUNCTION_NAME,?LINE}]),
-    A2=[{PodNode,ApplList}||{PodNode,{ok,ApplList}}<-A1],
-    [Pod]=[Pod||{Pod,ApplList}<-A2,
-		      true==lists:member(ApplSpec,ApplList)],
-    ok=lib_pod:create_node(Pod),
-    
-    {ok,Pod}.
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_local()->
     ok=application:start(common),
-    pong=common:ping(),
     ok=application:start(sd),
-    pong=sd:ping(),
     ok=application:start(db_etcd),
     pong=db_etcd:ping(),
     ok=db_etcd:config(),
-    ok=db_config:create_table(),
-
-  %  ok=application:start(infra_service),
-  %  pong=infra_service:ping(),
-  %  pong=parent_server:ping(),
-  %  pong=pod_server:ping(),
-  %  pong=appl_server:ping(),
     
+    ok=application:start(infra_service),
+    pong=parent_server:ping(),
+    pong=pod_server:ping(),
+    pong=appl_server:ping(),
+
     ok.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+start_parents()->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
 
-				    
+    % just for testing 
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_parent_desired_state:get_all_id()],
+    timer:sleep(2000),
+    [rpc:call(Pod,init,stop,[],5000)||Pod<-db_pod_desired_state:get_all_id()],
+    timer:sleep(1000),
+    %------------------
+    {ok,StoppedParents}=parent_server:stopped_nodes(),
+    StartParents=[{parent_server:create_node(Parent),Parent}||Parent<-StoppedParents],
+
+    io:format("StartParents ~p~n",[{StartParents,?MODULE,?LINE}]),
+
+    {ok,ActiveParents}=parent_server:active_nodes(),
+    _=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
+								   Pod2<-ActiveParents,
+								   Pod1/=Pod2],
+    {ok,ActiveParents}.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+initiate_local_dbase(ClusterSpec)->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    ok=parent_server:load_desired_state(ClusterSpec),
+    ok=pod_server:load_desired_state(ClusterSpec),
+    ok=appl_server:load_desired_state(ClusterSpec),	
+    
+    
+    ok.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
 ensure_right_cookie(ClusterSpec)->
-    Result=case db_cluster_spec:read(cookie,ClusterSpec) of
-	       {error,Reason}->
-		   {error,[Reason,?MODULE,?LINE]};
-	       {ok,Cookie}->
-		   erlang:set_cookie(node(),list_to_atom(Cookie)),
-		   ok
-	   end,
-    Result.
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-load_desired_states(ClusterSpec)->
-    ok=db_parent_desired_state:create_table(),
-    ok=lib_parent:load_desired_state(ClusterSpec),
-    ok=db_pod_desired_state:create_table(),
-    ok=lib_pod:load_desired_state(ClusterSpec),
-    ok=lib_appl:load_desired_state(ClusterSpec),
-     Result=ok,
-%    Result=case {Result1,Result2,Result3} of
-%	       {ok,ok,ok}->
-%		   ok;
-%	       _ ->
-%		   {error,[" Parent,Pod,Appl : ",Result1,Result2,Result1,?MODULE,?LINE]}
-%	   end,
-    Result.
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_parent_nodes()->	
-    {ok,StoppedParents}=lib_parent:stopped_nodes(),
-    _R1=[lib_parent:create_node(Parent)||Parent<-StoppedParents],
-    {ok,ActiveParents}=lib_parent:active_nodes(),
-    _R=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActiveParents,
-							  Pod2<-ActiveParents,
-								   Pod1/=Pod2],
-    {ok,UpdatedActiveParents}=lib_parent:active_nodes(),
-    {ok,UpdatedStoppedParents}=lib_parent:stopped_nodes(),
-    {ok,[{active,UpdatedActiveParents},{stopped,UpdatedStoppedParents}]}.
-%%--------------------------------------------------------------------
-%% @doc
-%% @spec
-%% @end
-%%--------------------------------------------------------------------
-start_pod_nodes()->	
-    {ok,StoppedPods}=pod_server:stopped_nodes(),
-    _R1=[pod_server:create_node(Pod)||Pod<-StoppedPods],
-    {ok,ActivePods}=pod_server:active_nodes(),
-    _R=[{net_adm:ping(Pod1),rpc:call(Pod1,net_adm,ping,[Pod2],5000)}||Pod1<-ActivePods,
-							  Pod2<-ActivePods,
-								   Pod1/=Pod2],
-    {ok,UpdatedActivePods}=pod_server:active_nodes(),
-    {ok,UpdatedStoppedPods}=pod_server:stopped_nodes(),
-    {ok,[{active,UpdatedActivePods},{stopped,UpdatedStoppedPods}]}.
-
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
+    erlang:set_cookie(node(),list_to_atom(Cookie)),
     
+    ok.
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
 %% @end
 %%--------------------------------------------------------------------
+running_apps(Node)->
+    Nodes=lists:delete(node(),[Node|rpc:call(Node,erlang,nodes,[],5000)]),
+    running_apps(Nodes,[]).
 
-create_appl(WantedApp)->
-    {ok,StoppedApplInfoLists}=appl_server:stopped_appls(),   
-    Stopped=[{PodNode,ApplSpec,App}||{PodNode,ApplSpec,App}<-StoppedApplInfoLists,
-					   WantedApp==App],
-    StartResult=[{error,Reason}||{error,Reason}<-create_appl(Stopped,[])],
-    Result=case StartResult of
-	       []->
-		   ok;
-	       StartResult->
-		   {error,["Couldnt create Appl : ",WantedApp,?MODULE,?FUNCTION_NAME,?LINE]}
-	   end,
-    Result.
-
-create_appl([],Acc)->
+running_apps([],Acc)->
     Acc;
-create_appl([{PodNode,ApplSpec,App}|T],Acc)->
-    Result=appl_server:create_appl(ApplSpec,PodNode),
-    io:format("Creat Appl Result ~p~n",[{Result,PodNode,ApplSpec,?MODULE,?FUNCTION_NAME,?LINE}]),
-    create_appl(T,[{Result,PodNode,ApplSpec,App}|Acc]).
+running_apps([Node|T],Acc)->
+    AppInfo=[{App,Info,Vsn}||{App,Info,Vsn}<-rpc:call(Node,application,which_applications,[],5000),
+			     stdlib/=App,
+			     kernel/=App],
+    running_apps(T,[{Node,AppInfo}|Acc]).
     
 
+
+running_nodes(Node)->
+    
+    lists:delete(node(),[Node|rpc:call(Node,erlang,nodes,[],5000)]).

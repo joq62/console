@@ -5,8 +5,7 @@
               {mod,{console_app,[]}},
               {applications,[kernel,stdlib]},
               {env,[]},
-              {modules,[appl,console,console_app,console_server,console_sup,
-                        lib_appl,lib_console,lib_infra_service,lib_parent,
-                        lib_pod,ops_ssh]},
+              {modules,[console,console_app,console_server,console_sup,
+                        lib_console]},
               {licenses,["Apache-2.0"]},
               {links,[]}]}.

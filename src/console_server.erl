@@ -17,10 +17,6 @@
 
 %% --------------------------------------------------------------------
 -define(HeartbeatTime,20*1000).
--define(ApplTimeOut,2*5000).
--define(LocalTypes,[oam,nodelog,db_etcd]).
--define(TargetTypes,[oam,nodelog,db_etcd]).
--define(ApplSpecs,["common","resource_discovery","nodelog","db_etcd","infra_service"]).
 
 %% External exports
 
@@ -86,7 +82,6 @@ handle_call({new_cluster,ClusterSpec},_From, State) ->
 		  case lib_console:new_cluster(ClusterSpec) of
 		      {error,Reason}->
 			  NewState=State,
-			  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Couldnt create new cluster ",ClusterSpec,Reason,?MODULE,?LINE]]),
 			  {error,Reason};
 		      ok->
 			  NewState=State#state{cluster_spec=ClusterSpec},
@@ -94,7 +89,6 @@ handle_call({new_cluster,ClusterSpec},_From, State) ->
 		  end;
 	      _ ->
 		  NewState=State,
-		  sd:cast(nodelog,nodelog,log,[warning,?MODULE_STRING,?LINE,["Already created : ",State#state.cluster_spec,?MODULE,?LINE]]),
 		  {error,["Already created : ",State#state.cluster_spec]}
 	  end,		   
     {reply, Reply, NewState};
@@ -119,10 +113,7 @@ handle_call({connect,ClusterSpec},_From, State) ->
 			
 			   %io:format("Ping ~p~n",[{Ping,?MODULE,?FUNCTION_NAME}]),
 			   %io:format("nodes() ~p~n",[{nodes(),?MODULE,?FUNCTION_NAME}]),
-			   [rd:add_local_resource(Type,node())||Type<-?LocalTypes],
-			   [rd:add_target_resource_type(Type)||Type<-?TargetTypes],
-			   ok=rd:trade_resources(),
-			   timer:sleep(3000),
+			  
 			   ok
 		   end
 	   end,
@@ -140,10 +131,6 @@ handle_call({deploy_appls},_From, State) ->
     Reply=appl_server:deploy_appls(State#state.cluster_spec),
     {reply, Reply, State};
 
-
-handle_call({new_appl,ApplSpec,HostSpec},_From, State) ->
-    Reply= appl_server:new(ApplSpec,HostSpec,State#state.cluster_spec,?ApplTimeOut),
-    {reply, Reply, State};
 
 
 handle_call({new_appl,ApplSpec,HostSpec,TimeOut},_From, State) ->

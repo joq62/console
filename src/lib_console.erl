@@ -61,8 +61,7 @@ new_cluster(ClusterSpec)->
     [{ok,_,_,_}]=lib_infra_service:create_appl([{InfraPod,"sd",sd}]),
     ok=lib_infra_service:create_infra_appl({InfraPod,"infra_service",infra_service},ClusterSpec),
     true=rpc:cast(InfraPod,infra_service,start_orchistrate,[]),
-    
-
+    application:stop(infra_service),
     
     io:format("Phase 3 Running nodes !!! ~p~n",[{running_nodes(NodelogPod),?MODULE,?FUNCTION_NAME}]),
     io:format("Phase 3 Running apps !!! ~p~n",[{running_apps(NodelogPod),?MODULE,?FUNCTION_NAME}]),
@@ -162,9 +161,6 @@ running_apps([Node|T],Acc)->
 			     stdlib/=App,
 			     kernel/=App],
     running_apps(T,[{Node,AppInfo}|Acc]).
-    
-
 
 running_nodes(Node)->
-    
     lists:delete(node(),[Node|rpc:call(Node,erlang,nodes,[],5000)]).

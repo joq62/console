@@ -55,6 +55,34 @@ clean:
 	rm -rf nodelog;
 	rm -rf db_etcd;
 
+connect:
+	rm -rf  *~ */*~ src/*.beam tests/*.beam
+	rm -rf erl_cra*;	
+	rm -rf tests_ebin
+	rm -rf ebin;
+	rm -rf Mnesia.*;
+	rm -rf *.dir;
+	rm -rf _build*;
+	rm -f rebar.lock;
+#	tests
+	mkdir tests_ebin;
+	erlc -I include -o tests_ebin tests/*.erl;
+#  	dependencies
+	rm -rf common;
+#	git clone https://github.com/joq62/common.git;
+	rm -rf sd;
+#	git clone https://github.com/joq62/sd.git;
+	rm -rf db_etcd;
+#	git clone https://github.com/joq62/db_etcd.git;
+	rm -rf infra_service;
+#	git clone https://github.com/joq62/infra_service.git;
+#	Applications
+	mkdir ebin;		
+	rebar3 compile;	
+	cp _build/default/lib/*/ebin/* ebin;
+	rm -rf _build*;
+	erl -pa * -pa */ebin -pa ebin -pa tests_ebin -sname console -run connect start $(a) $(b) -setcookie test_cookie
+
 eunit:
 	rm -rf  *~ */*~ src/*.beam tests/*.beam
 	rm -rf erl_cra*;	

@@ -21,6 +21,51 @@
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+%% --------------------------------------------------------------------
+%% Function: available_hosts()
+%% Description: Based on hosts.config file checks which hosts are avaible
+%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
+%% --------------------------------------------------------------------
+-define(TestCluster,"c200_c201").
+
+start([ClusterSpec,_HostSpec])->
+    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+    
+    ok=setup(ClusterSpec),
+    ok=console:new_cluster(?TestCluster),
+    loop(),
+       
+    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
+ %   timer:sleep(2000),
+ %  init:stop(),
+    ok.
+
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+-define(Sleep,30*1000).
+loop()->
+    timer:sleep(?Sleep),
+     io:format("------------------- ~p~n",[time()]),  
+    StoppedParents=sd:call(infra_service,parent_server,stopped_nodes,[],6000),
+    StoppedPods=sd:call(infra_service,pod_server,stopped_nodes,[],5*5000),
+    StoppedAppls=sd:call(infra_service,appl_server,stopped_appls,[],5*5000),
+    io:format("StoppedParents ~p~n",[{StoppedParents,?MODULE,?FUNCTION_NAME,?LINE}]),    
+    io:format("StoppedPods ~p~n",[{StoppedPods,?MODULE,?FUNCTION_NAME,?LINE}]),    
+    io:format("StoppedAppls ~p~n",[{StoppedAppls,?MODULE,?FUNCTION_NAME,?LINE}]),   
+    loop().
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
 stop()->
     stop(c200_c201_parent@c201).
 
@@ -57,24 +102,6 @@ alert()->
 %%--------------------------------------------------------------------
 print(Arg1,Arg2)->
     io:format(Arg1,Arg2).
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
--define(TestCluster,"c200_c201").
-
-start([ClusterSpec,_HostSpec])->
-    io:format("Start ~p~n",[{?MODULE,?FUNCTION_NAME}]),
-    
-    ok=setup(ClusterSpec),
-    ok=console:new_cluster(?TestCluster),
-       
-    io:format("Stop OK !!! ~p~n",[{?MODULE,?FUNCTION_NAME}]),
- %   timer:sleep(2000),
- %  init:stop(),
-    ok.
-
 
 %% --------------------------------------------------------------------
 %% Function: available_hosts()

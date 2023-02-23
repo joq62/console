@@ -32,8 +32,7 @@
 %%-------------------------------------------------------------------
 -record(state,{
 	       cluster_spec,
-	       connect_node,
-	       pod_node
+	       pods
 	      }).
 
 
@@ -62,8 +61,7 @@ init([]) ->
     io:format("Started Server ~p~n",[{?MODULE,?LINE}]), 
     
     {ok, #state{cluster_spec=undefined,
-		connect_node=undefined,
-		pod_node=undefined}}.   
+		pods=undefined}}.   
  
 
 %% --------------------------------------------------------------------
@@ -94,30 +92,26 @@ handle_call({new_cluster,ClusterSpec},_From, State) ->
     {reply, Reply, NewState};
 
 handle_call({connect,ClusterSpec},_From, State) ->
-    Reply =if 
-	       State#state.cluster_spec /= undefined ->
-		   {error,[already_connected,State#state.cluster_spec]};
-	       true->
-		   case db_cluster_spec:member(ClusterSpec) of
-		       false->
-			   {error,[eexists,ClusterSpec]};
-		       true->
-						% Ensure right cookie
-			   {ok,Cookie}=db_cluster_spec:read(cookie,ClusterSpec),
-			   erlang:set_cookie(node(),list_to_atom(Cookie)),
-						% Connect_nodes
-			   {ok,_}=connect_server:create_dbase_info(ClusterSpec),
-			   ConnectNodes=[maps:get(pod_node,Map)||Map<-connect_server:connect_nodes_info(ClusterSpec)],
-			   AllNodes=lists:append([rpc:call(Node,erlang,nodes,[],2000)||Node<-ConnectNodes]),
-			   _Ping=[{net_adm:ping(Node),Node}||Node<-AllNodes],
-			
-			   %io:format("Ping ~p~n",[{Ping,?MODULE,?FUNCTION_NAME}]),
-			   %io:format("nodes() ~p~n",[{nodes(),?MODULE,?FUNCTION_NAME}]),
-			  
-			   ok
-		   end
+    Reply =case State#state.cluster_spec of
+	       undefined->
+		   ok=local:start_local(ClusterSpec),
+		   ok=parent_server:load_desired_state(ClusterSpec),
+		   ok=pod_server:load_desired_state(ClusterSpec),
+		   ok=appl_server:load_desired_state(ClusterSpec),
+		   [DbEtcd]=sd:get_node(db_etcd),
+		   Pods=rpc:call(DbEtcd,db_pod_desired_state,get_all_id,[],10*1000),
+		   application:stop(db_etcd),
+		   application:stop(infra_service),
+		   PingR=[{net_adm:ping(Pod),Pod}||Pod<-Pods],
+		   NewState=State#state{cluster_spec=ClusterSpec,
+					pods=Pods},
+		   {ok,PingR};
+		  
+	       _->
+		   NewState=State,
+		   {error,[already_connected,State#state.cluster_spec]}
 	   end,
-    {reply, Reply, State};
+    {reply, Reply, NewState};
  
   
 
